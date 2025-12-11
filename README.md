@@ -236,14 +236,22 @@ Key features:
 
 ```
 Rag/
-├── LangChain.py          # LangChain-based RAG agent
-├── LangGraph.py          # LangGraph-based RAG agent with state management
-├── RAG-Agent.py          # Pure OpenAI RAG agent with ChromaDB
-├── pyproject.toml        # UV project configuration
-├── uv.lock               # UV lock file (auto-generated)
-├── .env                  # Environment variables (OPENAI_API_KEY)
-├── chroma_db/            # ChromaDB persistence directory
-└── VIVEK-VISHWAKARMA-RESUME.md  # Sample knowledge base document
+├── LangChain.py                                    # LangChain-based RAG agent
+├── LangGraph.py                                    # LangGraph-based RAG agent with state management
+├── RAG-Agent.py                                    # Pure OpenAI RAG agent with ChromaDB
+├── Multi-LLM-RAG-Agent.py                          # Multi-LLM RAG agent
+├── Claude.py                                       # PDF to Text extractor using Claude API
+├── VeoVideoGeneration.py                           # AI Video generation using Google Veo API
+├── Gemini-Flash-Image-(Nano Banana)(text-to-image).py  # Text-to-image generation using Gemini
+├── Image-editing-(text-and-image-to-image).py     # Image editing using Gemini
+├── pyproject.toml                                  # UV project configuration
+├── uv.lock                                         # UV lock file (auto-generated)
+├── .env                                            # Environment variables (API keys)
+├── .env.example                                    # Example environment configuration
+├── chroma_db/                                      # ChromaDB persistence directory
+├── generated_images/                               # Output directory for generated images
+├── generated_videos/                               # Output directory for generated videos
+└── VIVEK-VISHWAKARMA-RESUME.md                     # Sample knowledge base document
 ```
 
 ---
@@ -704,6 +712,135 @@ def query(self, question: str, n_context: int = 5) -> str:
 
 ---
 
+### 4. VeoVideoGeneration.py - AI Video Generation
+
+This file generates multi-part cinematic videos using Google's Veo 3.1 API.
+
+**Features**:
+- Sequential video generation with scene continuity
+- Video extension using previous clips as reference
+- Automatic polling for operation completion
+- Individual MP4 file output for each video part
+
+**Architecture Flow**:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Veo Video Generation Pipeline                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌────────────┐    ┌────────────┐    ┌────────────┐                 │
+│  │  Prompt 1  │───>│  Generate  │───>│  Part 1    │                 │
+│  │  (Base)    │    │  Base Video│    │  .mp4      │                 │
+│  └────────────┘    └────────────┘    └─────┬──────┘                 │
+│                                            │                        │
+│  ┌────────────┐    ┌────────────┐    ┌─────▼──────┐                 │
+│  │  Prompt 2  │───>│  Extend    │───>│  Part 2    │                 │
+│  │            │    │  Video     │    │  .mp4      │                 │
+│  └────────────┘    └────────────┘    └─────┬──────┘                 │
+│                                            │                        │
+│                    ... (repeat for parts 3, 4)                      │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Usage**:
+```bash
+uv run python VeoVideoGeneration.py
+```
+
+**Environment**: Requires `GOOGLE_API_KEY` in `.env`
+
+---
+
+### 5. Claude.py - PDF to Text Extractor
+
+This file extracts text from PDF documents using Claude API with parallel processing.
+
+**Features**:
+- In-memory PDF splitting (no temporary files)
+- Parallel processing with configurable worker threads
+- Thread-safe logging for progress tracking
+- Detailed timing and cost breakdown
+- Token usage tracking and cost estimation
+
+**Architecture Flow**:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    PDF to Text Pipeline                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
+│  │   PDF    │───>│  Split into  │───>│  Parallel Processing     │   │
+│  │   File   │    │  Chunks      │    │  (ThreadPoolExecutor)    │   │
+│  └──────────┘    └──────────────┘    └────────────┬─────────────┘   │
+│                                                   │                 │
+│                                      ┌────────────▼─────────────┐   │
+│                                      │  Claude API (per chunk)  │   │
+│                                      │  - Upload PDF chunk      │   │
+│                                      │  - Extract text          │   │
+│                                      └────────────┬─────────────┘   │
+│                                                   │                 │
+│  ┌──────────┐    ┌──────────────┐    ┌────────────▼─────────────┐   │
+│  │  Output  │<───│  Concatenate │<───│  Collect Results         │   │
+│  │  .txt    │    │  in Order    │    │  (Sort by chunk #)       │   │
+│  └──────────┘    └──────────────┘    └──────────────────────────┘   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Configuration** (at top of file):
+```python
+PDF_PATH = "your-pdf-file.pdf"  # Path to the input PDF file
+PAGES_PER_FILE = 5              # Number of pages per chunk
+MAX_WORKERS = 5                 # Maximum parallel threads
+OUTPUT_TEXT_FILE = "extracted_text.txt"
+```
+
+**Usage**:
+```bash
+uv run python Claude.py
+```
+
+**Environment**: Requires `CLAUDE_API_KEY` in `.env`
+
+---
+
+### 6. Gemini-Flash-Image-(Nano Banana)(text-to-image).py - Text to Image
+
+This file generates images from text prompts using Google's Gemini 2.5 Flash Image model.
+
+**Features**:
+- Text-to-image generation
+- High-quality image output
+- Simple API usage
+
+**Usage**:
+```bash
+uv run python "Gemini-Flash-Image-(Nano Banana)(text-to-image).py"
+```
+
+**Environment**: Requires `GOOGLE_API_KEY` in `.env`
+
+---
+
+### 7. Image-editing-(text-and-image-to-image).py - Image Editing
+
+This file edits existing images based on text prompts using Google's Gemini 2.5 Flash Image model.
+
+**Features**:
+- Image editing with text guidance
+- Professional photo enhancement
+- Background modification
+
+**Usage**:
+```bash
+uv run python "Image-editing-(text-and-image-to-image).py"
+```
+
+**Environment**: Requires `GOOGLE_API_KEY` in `.env`
+
+---
+
 ## Setup with UV
 
 ### Step 1: Install UV
@@ -746,10 +883,23 @@ UV will:
 
 ### Step 4: Setup Environment Variables
 
-Create a `.env` file in the project root:
+Copy the example environment file and fill in your API keys:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your API keys:
 
 ```env
-OPENAI_API_KEY=your-openai-api-key-here
+# Required for RAG agents (LangChain.py, LangGraph.py, RAG-Agent.py)
+OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# Required for video/image generation (VeoVideoGeneration.py, Gemini-Flash-Image, Image-editing)
+GOOGLE_API_KEY=your-google-api-key-here
+
+# Required for PDF text extraction (Claude.py)
+CLAUDE_API_KEY=sk-ant-your-claude-api-key-here
 ```
 
 ---
@@ -840,6 +990,8 @@ Once running in interactive mode, use these commands:
 
 ## Comparison Table
 
+### RAG Agents
+
 | Feature | LangChain.py | LangGraph.py | RAG-Agent.py |
 |---------|--------------|--------------|--------------|
 | Framework | LangChain | LangGraph | Pure OpenAI |
@@ -850,6 +1002,17 @@ Once running in interactive mode, use these commands:
 | Web Search | Yes | Yes | No |
 | Complexity | Medium | High | Low |
 | Best For | Simple agents | Complex workflows | Basic RAG |
+| API Key | OPENAI_API_KEY | OPENAI_API_KEY | OPENAI_API_KEY |
+
+### Media Generation
+
+| Feature | VeoVideoGeneration.py | Gemini-Flash-Image | Image-editing | Claude.py |
+|---------|----------------------|-------------------|---------------|-----------|
+| Type | Video Generation | Text-to-Image | Image Editing | PDF to Text |
+| API | Google Veo 3.1 | Google Gemini | Google Gemini | Anthropic Claude |
+| Input | Text prompts | Text prompt | Image + Text | PDF file |
+| Output | MP4 videos | PNG image | PNG image | Text file |
+| API Key | GOOGLE_API_KEY | GOOGLE_API_KEY | GOOGLE_API_KEY | CLAUDE_API_KEY |
 
 ---
 
@@ -857,6 +1020,7 @@ Once running in interactive mode, use these commands:
 
 All managed via `pyproject.toml`:
 
+**RAG & LangChain**:
 - `langchain` - Core LangChain framework
 - `langgraph` - Graph-based agent workflows
 - `langchain-openai` - OpenAI integration
@@ -864,6 +1028,16 @@ All managed via `pyproject.toml`:
 - `chromadb` - Vector database
 - `faiss-cpu` - Facebook AI Similarity Search
 - `openai` - OpenAI Python SDK
+
+**Google AI**:
+- `google-genai` - Google Generative AI SDK (Gemini, Veo)
+- `pillow` - Image processing
+
+**Anthropic**:
+- `anthropic` - Claude API client
+- `PyPDF2` - PDF reading and manipulation
+
+**Utilities**:
 - `python-dotenv` - Environment variable management
 - `requests` - HTTP client
 - `ddgs` - DuckDuckGo search
