@@ -40,8 +40,10 @@ Note:
 Author: [Your Name]
 Date: 2025
 """
+
 import os
 import time
+
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -50,7 +52,10 @@ from google.genai import types
 load_dotenv()
 
 # 🔑 API Key from .env
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+api_key = os.getenv("GOOGLE_API_KEY")
+if api_key is None:
+    raise ValueError("GOOGLE_API_KEY environment variable is not set")
+client = genai.Client(api_key=api_key)
 
 # ============================================
 # PROMPTS (Each for a sequential extension)

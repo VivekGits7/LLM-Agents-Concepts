@@ -116,7 +116,7 @@ OUTPUT_TEXT_FILE = "extracted_text.txt"  # Output filename
 CLAUDE_PROMPT = "Extract all text content from this PDF document. Return only the text content without any additional commentary or formatting."
 
 # 🔑 API Key from .env file
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+CLAUDE_API_KEY: str | None = os.getenv("CLAUDE_API_KEY")
 # ============================================
 
 # Thread-safe print lock
@@ -246,8 +246,6 @@ def process_pdf_chunk(chunk_data, api_key, prompt):
         # Get token usage
         input_tokens = response.usage.input_tokens
         output_tokens = response.usage.output_tokens
-        total_tokens = input_tokens + output_tokens
-
         elapsed_time = time.time() - start_time
         safe_print(f"[Part {chunk_num}] Completed in {elapsed_time:.2f}s | Tokens: {input_tokens} in, {output_tokens} out")
 

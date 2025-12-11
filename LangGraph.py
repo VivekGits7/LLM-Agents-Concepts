@@ -5,24 +5,26 @@ LangGraph RAG Agent with OpenAI
 - Tools: Current Date, India Time, India Weather, Web Search, Fetch URL, Knowledge Base Search
 """
 
+from __future__ import annotations
+
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
-from langgraph.graph.state import CompiledStateGraph
-from typing_extensions import TypedDict
 
-from dotenv import load_dotenv
-from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.documents import Document
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
 import requests
 from ddgs import DDGS
+from dotenv import load_dotenv
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import ToolNode
+from typing_extensions import TypedDict
 
 # Load environment variables
 load_dotenv()
@@ -251,7 +253,7 @@ Remember: The resume owner is Vivek Vishwakarma from Jabalpur, Madhya Pradesh, I
 tools = [get_current_date, get_india_time, get_india_weather, search_knowledge_base, web_search, fetch_url]
 
 
-def create_graph() -> CompiledStateGraph[AgentState, None, AgentState, AgentState]:
+def create_graph() -> CompiledStateGraph:
     """Create the LangGraph agent workflow."""
 
     # Initialize the LLM with tools

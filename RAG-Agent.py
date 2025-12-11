@@ -3,18 +3,26 @@ OpenAI RAG Agent - Retrieval-Augmented Generation with Markdown Files
 Uses OpenAI embeddings and ChromaDB for vector storage
 """
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
+from typing import cast
+
+import chromadb
+from chromadb.api.types import EmbeddingFunction, Embeddable
+from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from openai import OpenAI
-import chromadb
-from chromadb.utils import embedding_functions
 
 # Load environment variables
 load_dotenv()
 
 # Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if openai_api_key is None:
+    raise ValueError("OPENAI_API_KEY environment variable is not set")
+client = OpenAI(api_key=openai_api_key)
 
 # ChromaDB settings
 CHROMA_PERSIST_DIR = "./chroma_db"
@@ -97,7 +105,7 @@ class RAGAgent:
         # Get or create collection
         self.collection = self.chroma_client.get_or_create_collection(
             name=COLLECTION_NAME,
-            embedding_function=self.embedding_fn,
+            embedding_function=cast(EmbeddingFunction[Embeddable], self.embedding_fn),
             metadata={"description": "RAG collection for markdown documents"}
         )
 
@@ -128,7 +136,7 @@ class RAGAgent:
         ids = [f"{file_name}_chunk_{i}" for i in range(len(chunks))]
 
         # Prepare metadata for each chunk
-        metadatas = [
+        metadatas: list[dict[str, str | int | float | bool | None]] = [
             {
                 "source": file_path,
                 "file_name": file_name,
@@ -142,7 +150,7 @@ class RAGAgent:
         self.collection.add(
             documents=chunks,
             ids=ids,
-            metadatas=metadatas
+            metadatas=metadatas  # type: ignore[arg-type]
         )
 
         print(f"Added {len(chunks)} chunks from '{file_name}' to the database")
@@ -227,7 +235,7 @@ Please provide a comprehensive answer based on the context above."""
             max_tokens=1000
         )
 
-        return response.choices[0].message.content
+        return response.choices[0].message.content or ""
 
     def clear_collection(self):
         """Clear all documents from the collection."""
@@ -235,7 +243,7 @@ Please provide a comprehensive answer based on the context above."""
         self.chroma_client.delete_collection(COLLECTION_NAME)
         self.collection = self.chroma_client.get_or_create_collection(
             name=COLLECTION_NAME,
-            embedding_function=self.embedding_fn
+            embedding_function=cast(EmbeddingFunction[Embeddable], self.embedding_fn)
         )
         print("Collection cleared")
 
@@ -246,10 +254,14 @@ Please provide a comprehensive answer based on the context above."""
 
         # Get all documents with metadata
         all_data = self.collection.get(include=["metadatas"])
-        sources = set()
-        for metadata in all_data['metadatas']:
-            if metadata and 'file_name' in metadata:
-                sources.add(metadata['file_name'])
+        sources: set[str] = set()
+        metadatas = all_data['metadatas']
+        if metadatas is not None:
+            for metadata in metadatas:
+                if metadata and 'file_name' in metadata:
+                    file_name = metadata['file_name']
+                    if isinstance(file_name, str):
+                        sources.add(file_name)
 
         return list(sources)
 

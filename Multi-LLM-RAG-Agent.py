@@ -21,15 +21,18 @@ Usage:
 Author: Multi-LLM Agent System
 """
 
+from __future__ import annotations
+
+import argparse
+import logging
 import os
 import sys
 import time
-import logging
-import argparse
-from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import Annotated, Literal, Optional
 from io import BytesIO
+from pathlib import Path
+from typing import Annotated, Any, Literal, Optional
+
 from typing_extensions import TypedDict
 
 # Load environment variables first
@@ -331,7 +334,7 @@ class RAGKnowledgeBase:
     def __init__(self):
         logger.info("Initializing RAG Knowledge Base")
         self.embeddings = OpenAIEmbeddings(model=Config.OPENAI_EMBEDDING_MODEL)
-        self.vector_store = None
+        self.vector_store: Optional[FAISS] = None
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=Config.CHUNK_SIZE,
             chunk_overlap=Config.CHUNK_OVERLAP,
@@ -438,7 +441,7 @@ class GeminiImageGenerator:
         self.output_dir = Path(Config.IMAGE_OUTPUT_DIR)
         self.output_dir.mkdir(exist_ok=True)
         # Store last generated image response for video generation
-        self.last_generated_response = None
+        self.last_generated_response: Any = None
         self.last_generated_path: Optional[str] = None
 
     def generate_image(self, prompt: str, output_filename: Optional[str] = None) -> str:
@@ -464,10 +467,13 @@ class GeminiImageGenerator:
             self.last_generated_response = response
 
             # Process response
+            if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
+                return "Image generation completed but no valid response was returned."
+
             for part in response.candidates[0].content.parts:
                 if part.text is not None:
                     logger.info(f"Gemini response text: {part.text}")
-                elif part.inline_data is not None:
+                elif part.inline_data is not None and part.inline_data.data is not None:
                     # Generate filename if not provided
                     if output_filename is None:
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -516,10 +522,13 @@ class GeminiImageGenerator:
             )
 
             # Process response
+            if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
+                return "Image editing completed but no valid response was returned."
+
             for part in response.candidates[0].content.parts:
                 if part.text is not None:
                     logger.info(f"Gemini response text: {part.text}")
-                elif part.inline_data is not None:
+                elif part.inline_data is not None and part.inline_data.data is not None:
                     # Generate filename if not provided
                     if output_filename is None:
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -645,8 +654,18 @@ class VeoVideoGenerator:
 
             op = self._wait_for_operation(op, "video")
 
+            # Check if response is valid
+            if op.response is None:
+                return "Video generation failed: No response received from API"
+
+            if op.response.generated_videos is None or len(op.response.generated_videos) == 0:
+                return "Video generation failed: No videos in response"
+
             # Get the generated video
             video_clip = op.response.generated_videos[0]
+
+            if video_clip is None or video_clip.video is None:
+                return "Video generation failed: Invalid video data received"
 
             # Generate filename if not provided
             if output_filename is None:
@@ -695,7 +714,7 @@ class VeoVideoGenerator:
         logger.info(f"Veo Image-to-Video: prompt='{prompt[:50]}...'")
 
         try:
-            image_input = None
+            image_input: Any = None
 
             # Determine image source
             if use_last_generated:
@@ -722,18 +741,19 @@ class VeoVideoGenerator:
                 # Generate the image through Gemini first to get the proper format
                 response = self.client.models.generate_content(
                     model=Config.GEMINI_IMAGE_MODEL,
-                    contents=[f"Reproduce this image exactly as it is", pil_image],
+                    contents=["Reproduce this image exactly as it is", pil_image],
                     config={"response_modalities": ["IMAGE"]}
                 )
 
                 # Get the image from response
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, 'as_image'):
-                        image_input = part.as_image()
-                        break
-                    elif part.inline_data is not None:
-                        image_input = part
-                        break
+                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        if hasattr(part, 'as_image'):
+                            image_input = part.as_image()
+                            break
+                        elif part.inline_data is not None:
+                            image_input = part
+                            break
 
                 if image_input is None:
                     return "Failed to process the image for video generation."
@@ -874,7 +894,7 @@ class ClaudeAssistant:
         logger.info(f"Claude Reasoning: query='{query[:50]}...'")
 
         try:
-            messages = [
+            messages: list[dict[str, Any]] = [
                 {
                     "role": "user",
                     "content": f"{context}\n\n{query}" if context else query
@@ -884,7 +904,7 @@ class ClaudeAssistant:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]
             )
 
             result = ""
@@ -912,15 +932,16 @@ class ClaudeAssistant:
         logger.info(f"Claude Web Search: query='{query}'")
 
         try:
+            search_messages: list[dict[str, Any]] = [
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ]
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": query
-                    }
-                ],
+                messages=search_messages,  # type: ignore[arg-type]
                 tools=[{
                     "type": "web_search_20250305",
                     "name": "web_search",
@@ -937,8 +958,10 @@ class ClaudeAssistant:
                     if hasattr(block, 'citations') and block.citations:
                         result += "\n\nSources:\n"
                         for citation in block.citations:
-                            if hasattr(citation, 'url') and hasattr(citation, 'title'):
-                                result += f"- [{citation.title}]({citation.url})\n"
+                            url = getattr(citation, 'url', None)
+                            title = getattr(citation, 'title', None)
+                            if url and title:
+                                result += f"- [{title}]({url})\n"
 
             logger.info(f"Claude web search response: {len(result)} characters")
             return result
@@ -1220,7 +1243,7 @@ def interactive_mode():
     agent = create_agent_graph()
 
     # Conversation history
-    messages = []
+    messages: list[Any] = []
 
     while True:
         try:

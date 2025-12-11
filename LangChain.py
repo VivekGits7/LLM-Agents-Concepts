@@ -4,18 +4,20 @@ LangChain RAG Agent with OpenAI
 - Tools: India Time, India Weather
 """
 
+from __future__ import annotations
+
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+import requests
+from ddgs import DDGS
 from dotenv import load_dotenv
+from langchain_core.documents import Document
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.agents import create_agent
-from langchain_core.documents import Document
-import requests
-from ddgs import DDGS
+from langgraph.prebuilt import create_react_agent
 
 # Load environment variables
 load_dotenv()
@@ -243,11 +245,11 @@ def create_rag_agent():
 
     tools = [get_india_time, get_india_weather, search_knowledge_base, web_search, fetch_url]
 
-    # Create agent using LangChain's create_agent
-    agent = create_agent(
+    # Create agent using LangGraph's create_react_agent
+    agent = create_react_agent(
         model=llm,
         tools=tools,
-        system_prompt=SYSTEM_PROMPT
+        prompt=SYSTEM_PROMPT
     )
 
     return agent
